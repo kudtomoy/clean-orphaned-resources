@@ -4,7 +4,9 @@ A CLI tool to clean up orphaned AWS resources that remain after AWS CDK destroys
 
 ## Supported orphaned resources
 - `AWS::Logs::LogGroup`
+- `AWS::DynamoDB::Table`
 - `AWS::ECR::Repository`
+- `AWS::EFS::FileSystem`
 - `AWS::KMS::Key`
 - `AWS::S3::Bucket`
 
