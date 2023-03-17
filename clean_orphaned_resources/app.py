@@ -10,8 +10,7 @@ from clean_orphaned_resources import resource_types
 
 
 logger = logging.getLogger(__name__)
-logging.basicConfig()
-logger.setLevel(logging.INFO)
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
 
 def get_regions() -> list[str]:
@@ -54,14 +53,22 @@ def get_stack_resources(region: str) -> dict[str, dict[str, dict[str, str]]]:
 
 
 def print_orphaned_resource(
-    region: str, resource_type: str, resource_name: str
+    region: str, resource_type: str, resource_name: str, tags: str
 ) -> None:
-    print(f"{region},{resource_type},{resource_name}")
+    print(f"{region},{resource_type},{resource_name},{tags}")
 
 
-def parse_orphaned_resource(text: str) -> (str, str, str):
-    region, resource_type, resource_name = text.split(",")
-    return region, resource_type, resource_name
+def parse_orphaned_resource(text: str) -> (str, str, str, str):
+    parts = text.split(",")
+    region = parts[0]
+    resource_type = parts[1]
+    resource_name = parts[2]
+
+    tags = ""
+    if len(parts) > 3:
+        tags = parts[3]
+
+    return region, resource_type, resource_name, tags
 
 
 def list_orphaned_resources() -> None:
@@ -69,22 +76,24 @@ def list_orphaned_resources() -> None:
         logger.info(f"Fetching resources in {region} region...")
         stack_resources = get_stack_resources(region)
 
-        for resource_type in resource_types.modules.values():
-            for name in resource_type.list_resource_names(region):
+        for resource_type in resource_types.classes.values():
+            for name, tags in resource_type.list_resource_identifiers(region):
                 if name not in stack_resources[resource_type.RESOURCE_TYPE]:
-                    print_orphaned_resource(region, resource_type.RESOURCE_TYPE, name)
+                    print_orphaned_resource(
+                        region, resource_type.RESOURCE_TYPE, name, tags
+                    )
 
 
 def destroy_orphaned_resources() -> None:
     lines = sys.stdin.readlines()
 
     for line in lines:
-        region, resource_type, resource_name = parse_orphaned_resource(line.strip())
+        region, resource_type, resource_name, tags = parse_orphaned_resource(
+            line.strip()
+        )
         try:
             logger.info(f"Deleting {resource_name} ({resource_type})...")
-            resource_types.modules[resource_type].delete_resources(
-                region, [resource_name]
-            )
+            resource_types.classes[resource_type].delete_resource(region, resource_name)
         except botocore.exceptions.ClientError as e:
             logger.warning(e)
 

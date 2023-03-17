@@ -35,7 +35,11 @@ $ clean-orphaned-resources list > orphaned_resources.txt
 This command lists all orphaned resources that are not associated with any CloudFormation stacks.
 
 
-2. Review the list and manually remove any resources you do not want to delete.
+2. Review the list and manually remove any resources you do NOT want to delete.  
+The standard output file is formatted as follows.
+```txt
+<Region>,<ResourceType>,<ReouceName or ID>,<Tags>
+```
 
 3. Delete the orphaned resources listed in the file:
 ```bash

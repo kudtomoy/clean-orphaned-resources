@@ -1,32 +1,60 @@
 from logging import getLogger
+from functools import lru_cache
 
 import boto3
 
+from clean_orphaned_resources.resource_types.base import (
+    ResourceTypeBase,
+    handle_boto3_exceptions,
+)
 
-RESOURCE_TYPE = "AWS::ECR::Repository"
+
 logger = getLogger(__name__)
 
 
-def list_resource_names(region: str) -> list[str]:
-    client = boto3.client("ecr", region_name=region)
-    paginator = client.get_paginator("describe_repositories")
+class EcrRepository(ResourceTypeBase):
+    RESOURCE_TYPE = "AWS::ECR::Repository"
 
-    names = []
+    @staticmethod
+    @handle_boto3_exceptions("")
+    def get_tags(client, arn: str) -> str:
+        response = client.list_tags_for_resource(resourceArn=arn)
+        return ",".join([f"{tag['Key']}={tag['Value']}" for tag in response["tags"]])
 
-    for page in paginator.paginate():
-        for repo in page["repositories"]:
-            names.append(repo["repositoryName"])
+    @staticmethod
+    @lru_cache()
+    def get_account_id() -> str:
+        sts = boto3.client("sts")
+        identity = sts.get_caller_identity()
+        return identity["Account"]
 
-    return names
+    @staticmethod
+    @handle_boto3_exceptions([])
+    def list_resource_identifiers(region: str) -> list[tuple[str, str]]:
+        client = boto3.client("ecr", region_name=region)
+        paginator = client.get_paginator("describe_repositories")
 
+        identifiers = []
 
-def delete_resources(region: str, resource_names: list[str]) -> None:
-    client = boto3.client("ecr", region_name=region)
+        for page in paginator.paginate():
+            for repo in page["repositories"]:
+                name = repo["repositoryName"]
+                arn = f"arn:aws:ecr:{region}:{EcrRepository.get_account_id()}:repository/{name}"
+                tags = EcrRepository.get_tags(client, arn)
+                identifiers.append((name, tags))
 
-    for name in resource_names:
-        images = client.list_images(repositoryName=name)
+        return identifiers
+
+    @staticmethod
+    @handle_boto3_exceptions()
+    def delete_resource(region: str, identifier: str) -> None:
+        client = boto3.client("ecr", region_name=region)
+
+        images = client.list_images(repositoryName=identifier)
 
         if images.get("imageIds"):
-            client.batch_delete_image(repositoryName=name, imageIds=images["imageIds"])
+            client.batch_delete_image(
+                repositoryName=identifier, imageIds=images["imageIds"]
+            )
 
-        client.delete_repository(repositoryName=name)
+        client.delete_repository(repositoryName=identifier)

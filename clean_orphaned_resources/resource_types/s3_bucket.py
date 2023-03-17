@@ -3,57 +3,78 @@ from logging import getLogger
 import boto3
 import botocore.exceptions
 
+from clean_orphaned_resources.resource_types.base import (
+    ResourceTypeBase,
+    handle_boto3_exceptions,
+)
 
-RESOURCE_TYPE = "AWS::S3::Bucket"
+
 logger = getLogger(__name__)
 
 
-def list_resource_names(region: str) -> list[str]:
-    client = boto3.client("s3", region_name=region)
-    response = client.list_buckets()
-    names = []
+class S3Bucket(ResourceTypeBase):
+    RESOURCE_TYPE = "AWS::S3::Bucket"
 
-    for bucket in response["Buckets"]:
-        try:
-            bucket_location_response = client.get_bucket_location(Bucket=bucket["Name"])
-            bucket_region = bucket_location_response["LocationConstraint"]
+    @staticmethod
+    @handle_boto3_exceptions("")
+    def get_tags(client, name: str) -> str:
+        response = client.get_bucket_tagging(Bucket=name)
+        return ",".join([f"{tag['Key']}={tag['Value']}" for tag in response["TagSet"]])
 
-            if bucket_region == region or (
-                bucket_region is None and region == "us-east-1"
-            ):
-                names.append(bucket["Name"])
+    @staticmethod
+    @handle_boto3_exceptions([])
+    def list_resource_identifiers(region: str) -> list[tuple[str, str]]:
+        client = boto3.client("s3", region_name=region)
+        response = client.list_buckets()
+        identifiers = []
 
-        except botocore.exceptions.ClientError as e:
-            if e.response["Error"]["Code"] == "NoSuchBucket":
-                logger.info(f"Bucket '{bucket['Name']}' not found, skipping.")
-            else:
-                logger.info(f"Error occurred for bucket '{bucket['Name']}': {e}")
+        for bucket in response["Buckets"]:
+            bucket_name = bucket["Name"]
+            try:
+                bucket_location_response = client.get_bucket_location(
+                    Bucket=bucket_name
+                )
+                bucket_region = bucket_location_response["LocationConstraint"]
 
-    return names
+                if bucket_region == region or (
+                    bucket_region is None and region == "us-east-1"
+                ):
+                    tags = S3Bucket.get_tags(client, bucket_name)
+                    identifiers.append((bucket_name, tags))
 
+            except botocore.exceptions.ClientError as e:
+                if e.response["Error"]["Code"] == "NoSuchBucket":
+                    logger.info(f"Bucket '{bucket_name}' not found, skipping.")
+                else:
+                    raise e
 
-def delete_resources(region: str, resource_names: list[str]) -> None:
-    client = boto3.client("s3", region_name=region)
+        return identifiers
 
-    for name in resource_names:
-        versioning = client.get_bucket_versioning(Bucket=name)
+    @staticmethod
+    @handle_boto3_exceptions()
+    def delete_resource(region: str, identifier: str) -> None:
+        client = boto3.client("s3", region_name=region)
+
+        versioning = client.get_bucket_versioning(Bucket=identifier)
 
         if versioning.get("Status") == "Enabled":
-            object_versions = client.list_object_versions(Bucket=name)
+            object_versions = client.list_object_versions(Bucket=identifier)
 
             for version in object_versions.get("Versions", []):
                 client.delete_object(
-                    Bucket=name, Key=version["Key"], VersionId=version["VersionId"]
+                    Bucket=identifier,
+                    Key=version["Key"],
+                    VersionId=version["VersionId"],
                 )
 
             for marker in object_versions.get("DeleteMarkers", []):
                 client.delete_object(
-                    Bucket=name, Key=marker["Key"], VersionId=marker["VersionId"]
+                    Bucket=identifier, Key=marker["Key"], VersionId=marker["VersionId"]
                 )
 
-        objects = client.list_objects_v2(Bucket=name)
+        objects = client.list_objects_v2(Bucket=identifier)
 
         for obj in objects.get("Contents", []):
-            client.delete_object(Bucket=name, Key=obj["Key"])
+            client.delete_object(Bucket=identifier, Key=obj["Key"])
 
-        client.delete_bucket(Bucket=name)
+        client.delete_bucket(Bucket=identifier)
