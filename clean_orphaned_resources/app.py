@@ -9,8 +9,6 @@ import botocore.exceptions
 from clean_orphaned_resources import resource_types
 
 
-protected_resource_keywords = ["do-not-delete"]
-
 logger = logging.getLogger(__name__)
 logging.basicConfig()
 logger.setLevel(logging.INFO)
@@ -65,13 +63,6 @@ def parse_orphaned_resource(text: str) -> (str, str, str):
     return region, resource_type, resource_name
 
 
-def is_protected(name: str) -> bool:
-    for keyword in protected_resource_keywords:
-        if keyword in name:
-            return True
-    return False
-
-
 def list_orphaned_resources() -> None:
     for region in get_regions():
         logger.info(f"Fetching resources in {region} region...")
@@ -79,10 +70,7 @@ def list_orphaned_resources() -> None:
 
         for resource_type in resource_types.modules.values():
             for name in resource_type.list_resource_names(region):
-                if (
-                    not is_protected(name)
-                    and name not in stack_resources[resource_type.RESOURCE_TYPE]
-                ):
+                if name not in stack_resources[resource_type.RESOURCE_TYPE]:
                     print_orphaned_resource(region, resource_type.RESOURCE_TYPE, name)
 
 
@@ -93,7 +81,9 @@ def destroy_orphaned_resources() -> None:
         region, resource_type, resource_name = parse_orphaned_resource(line.strip())
         try:
             logger.info(f"Deleting {resource_name} ({resource_type})...")
-            resource_types.modules[resource_type].delete_resources(region, [resource_name])
+            resource_types.modules[resource_type].delete_resources(
+                region, [resource_name]
+            )
         except botocore.exceptions.ClientError as e:
             logger.warning(e)
 
@@ -103,7 +93,7 @@ class CleanOrphanedResources:
         """
         Lists the candidate resources to be deleted after an AWS CDK 'destroy' operation.
 
-        Usage: app.py list
+        Usage: clean-orphaned-resources list
         """
         list_orphaned_resources()
 
@@ -111,7 +101,7 @@ class CleanOrphanedResources:
         """
         Deletes the candidate resources after they are passed through standard input.
 
-        Usage: app.py destroy
+        Usage: clean-orphaned-resources destroy
         """
         destroy_orphaned_resources()
 
