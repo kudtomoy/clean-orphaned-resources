@@ -18,7 +18,8 @@ def get_regions() -> list[str]:
     ec2_client = boto3.client("ec2")
     regions = ec2_client.describe_regions()
     region_names = [region["RegionName"] for region in regions["Regions"]]
-    return region_names
+    return ["ap-northeast-1"]
+    # return region_names
 
 
 def get_stack_resources(region: str) -> dict[str, dict[str, dict[str, str]]]:
