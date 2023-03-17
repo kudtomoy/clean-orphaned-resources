@@ -93,7 +93,7 @@ def destroy_orphaned_resources() -> None:
         region, resource_type, resource_name = parse_orphaned_resource(line.strip())
         try:
             logger.info(f"Deleting {resource_name} ({resource_type})...")
-            modules.modules[resource_type].delete_resources(region, [resource_name])
+            resource_types.modules[resource_type].delete_resources(region, [resource_name])
         except botocore.exceptions.ClientError as e:
             logger.warning(e)
 
