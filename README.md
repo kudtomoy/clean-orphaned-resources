@@ -2,12 +2,29 @@
 
 A CLI tool to clean up orphaned AWS resources that remain after AWS CDK destroys stacks.
 
+## Supported orphaned resources
+- `AWS::Logs::LogGroup`
+- `AWS::ECR::Repository`
+- `AWS::KMS::Key`
+- `AWS::S3::Bucket`
+
 ## Requirements
 - Python 3.7 or later
 
-## Installing
+## Install
 ```bash
-$ pip3 install git+git://github.com/kudtomoy/clean-orphaned-resources.git
+$ pip3 install git+https://github.com/kudtomoy/clean-orphaned-resources.git
+```
+
+If you want to uninstall:
+```bash
+$ pip3 uninstall clean-orphaned-resources
+```
+
+The `clean-orphaned-resources` is installed as an executable file.  
+If needed, add its location to your system's PATH. Here's an example on my Mac:
+```bash
+$ export PATH=$PATH:$HOME/Library/Python/3.9/bin
 ```
 
 ## Usage
