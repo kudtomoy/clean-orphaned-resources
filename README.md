@@ -50,3 +50,14 @@ $ clean-orphaned-resources destroy < orphaned_resources.txt
 This command deletes all resources listed in the `orphaned_resources.txt` file.
 
 **Note**: Be cautious when using the `destroy` command, as it will permanently delete the specified resources. Always review the list of resources to be deleted and make sure you have backups if necessary.
+
+## Advanced Topics
+If you have named resources that you do not want to delete, you can exclude them from the list as follows:
+```bash
+$ clean-orphaned-resources list | grep -v do-not-delete > orphaned_resources.txt
+```
+
+When destroying, the `#` after each line is ignored and can be used as your comment space.
+```txt
+ap-northeast-1,AWS::Logs::LogGroup,/test-log-group,#<YourComment>
+```

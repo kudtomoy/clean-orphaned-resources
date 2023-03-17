@@ -59,6 +59,9 @@ def print_orphaned_resource(
 
 
 def parse_orphaned_resource(text: str) -> (str, str, str, str):
+    if "#" in text:
+        text = text.split("#", 1)[0]
+
     parts = text.split(",")
     region = parts[0]
     resource_type = parts[1]
