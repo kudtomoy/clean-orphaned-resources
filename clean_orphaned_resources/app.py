@@ -1,19 +1,23 @@
-from collections import defaultdict
 import logging
 import sys
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 
 import fire
 import boto3
-import botocore.exceptions
 
 from clean_orphaned_resources import resource_types
-
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
 
-def get_regions() -> list[str]:
+def get_default_region() -> str:
+    session = boto3.Session()
+    return session.region_name
+
+
+def get_all_regions() -> list[str]:
     ec2_client = boto3.client("ec2")
     regions = ec2_client.describe_regions()
     region_names = [region["RegionName"] for region in regions["Regions"]]
@@ -73,49 +77,46 @@ def parse_orphaned_resource(text: str) -> (str, str, str, str):
     return region, resource_type, resource_name, tags
 
 
-def list_orphaned_resources() -> None:
-    for region in get_regions():
-        logger.info(f"Fetching resources in {region} region...")
-        stack_resources = get_stack_resources(region)
+def list_orphaned_resources(region: str) -> None:
+    logger.info(f"Fetching resources in {region} region...")
+    stack_resources = get_stack_resources(region)
 
-        for resource_type in resource_types.classes.values():
-            for name, tags in resource_type.list_resource_identifiers(region):
-                if name not in stack_resources[resource_type.RESOURCE_TYPE]:
-                    print_orphaned_resource(
-                        region, resource_type.RESOURCE_TYPE, name, tags
-                    )
+    for resource_type in resource_types.classes.values():
+        for name, tags in resource_type.list_resource_identifiers(region):
+            if name not in stack_resources[resource_type.RESOURCE_TYPE]:
+                print_orphaned_resource(region, resource_type.RESOURCE_TYPE, name, tags)
 
 
-def destroy_orphaned_resources() -> None:
-    lines = sys.stdin.readlines()
-
-    for line in lines:
-        region, resource_type, resource_name, tags = parse_orphaned_resource(
-            line.strip()
-        )
-        try:
-            logger.info(f"Deleting {resource_name} ({resource_type})...")
-            resource_types.classes[resource_type].delete_resource(region, resource_name)
-        except botocore.exceptions.ClientError as e:
-            logger.warning(e)
+def destroy_orphaned_resources(line: str) -> None:
+    region, resource_type, resource_name, tags = parse_orphaned_resource(line)
+    logger.info(f"Deleting {resource_name} ({resource_type})...")
+    resource_types.classes[resource_type].delete_resource(region, resource_name)
 
 
 class CleanOrphanedResources:
-    def list(self):
+    def list(self, all_regions: bool = False, threads: int = 16):
         """
         Lists the candidate resources to be deleted after an AWS CDK 'destroy' operation.
 
         Usage: clean-orphaned-resources list
         """
-        list_orphaned_resources()
+        if not all_regions:
+            list_orphaned_resources(get_default_region())
 
-    def destroy(self):
+        else:
+            regions = get_all_regions()
+            with ThreadPoolExecutor(max_workers=threads) as executor:
+                executor.map(list_orphaned_resources, regions)
+
+    def destroy(self, threads: int = 16):
         """
         Deletes the candidate resources after they are passed through standard input.
 
         Usage: clean-orphaned-resources destroy
         """
-        destroy_orphaned_resources()
+        lines = sys.stdin.readlines()
+        with ThreadPoolExecutor(max_workers=threads) as executor:
+            executor.map(destroy_orphaned_resources, lines)
 
 
 def main():

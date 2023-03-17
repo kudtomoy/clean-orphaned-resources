@@ -34,8 +34,13 @@ $ export PATH=$PATH:$HOME/Library/Python/3.9/bin
 ```bash
 $ clean-orphaned-resources list > orphaned_resources.txt
 ```
-This command lists all orphaned resources that are not associated with any CloudFormation stacks.
 
+This command lists all orphaned resources that are not associated with any CloudFormation stacks.  
+By default, only the default region will be listed. To list all regions, use the `--all-regions (-a)` option.
+
+```bash
+$ clean-orphaned-resources list -a > orphaned_resources.txt
+```
 
 2. Review the list and manually remove any resources you do NOT want to delete.  
 The standard output file is formatted as follows.
