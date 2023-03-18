@@ -94,19 +94,20 @@ def destroy_orphaned_resources(line: str) -> None:
 
 
 class CleanOrphanedResources:
-    def list(self, all_regions: bool = False, threads: int = 16):
+    def list(self, region: str = None, all_regions: bool = False, threads: int = 16):
         """
         Lists the candidate resources to be deleted after an AWS CDK 'destroy' operation.
 
         Usage: clean-orphaned-resources list
         """
-        if not all_regions:
-            list_orphaned_resources(get_default_region())
-
-        else:
+        if all_regions:
             regions = get_all_regions()
             with ThreadPoolExecutor(max_workers=threads) as executor:
                 executor.map(list_orphaned_resources, regions)
+        else:
+            if not region:
+                region = get_default_region()
+            list_orphaned_resources(region)
 
     def destroy(self, threads: int = 16):
         """

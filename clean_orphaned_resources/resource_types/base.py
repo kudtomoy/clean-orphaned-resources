@@ -1,10 +1,19 @@
 from functools import wraps
 from logging import getLogger
+from functools import lru_cache
 
+import boto3
 import botocore.exceptions
 
 
 logger = getLogger(__name__)
+
+
+@lru_cache()
+def get_account_id() -> str:
+    sts = boto3.client("sts")
+    identity = sts.get_caller_identity()
+    return identity["Account"]
 
 
 def handle_boto3_exceptions(default_return_value=None):

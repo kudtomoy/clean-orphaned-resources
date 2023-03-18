@@ -13,7 +13,7 @@ A CLI tool to clean up orphaned AWS resources that remain after AWS CDK destroys
 ## Requirements
 - Python 3.7 or later
 
-## Install
+## Installation
 ```bash
 $ pip3 install git+https://github.com/kudtomoy/clean-orphaned-resources.git
 ```
@@ -37,6 +37,8 @@ $ clean-orphaned-resources list > orphaned_resources.txt
 
 This command lists all orphaned resources that are not associated with any CloudFormation stacks.  
 By default, only the default region will be listed. To list all regions, use the `--all-regions (-a)` option.
+
+See the `--help (-h)` command for all options.
 
 ```bash
 $ clean-orphaned-resources list -a > orphaned_resources.txt
@@ -65,4 +67,22 @@ $ clean-orphaned-resources list | grep -v do-not-delete > orphaned_resources.txt
 When destroying, the `#` after each line is ignored and can be used as your comment space.
 ```txt
 ap-northeast-1,AWS::Logs::LogGroup,/test-log-group,#<YourComment>
+```
+
+## Running pytest
+**Note**: These tests create and remove resources in a real AWS environment. Be sure to use your test AWS account and read the code beforehand.
+
+1. Install requirements for tests.
+```bash
+$ pip3 install -r dev-requirements.txt
+```
+
+2. If necessary, add the current directory to `PYTHONPATH`.
+```bash
+$ export PYTHONPATH=$PYTHONPATH:`pwd`
+```
+
+3. Run tests.
+```bash
+$ pytest tests
 ```

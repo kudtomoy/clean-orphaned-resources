@@ -4,6 +4,7 @@ from functools import lru_cache
 import boto3
 
 from clean_orphaned_resources.resource_types.base import (
+    get_account_id,
     ResourceTypeBase,
     handle_boto3_exceptions,
 )
@@ -22,13 +23,6 @@ class EcrRepository(ResourceTypeBase):
         return ",".join([f"{tag['Key']}={tag['Value']}" for tag in response["tags"]])
 
     @staticmethod
-    @lru_cache()
-    def get_account_id() -> str:
-        sts = boto3.client("sts")
-        identity = sts.get_caller_identity()
-        return identity["Account"]
-
-    @staticmethod
     @handle_boto3_exceptions([])
     def list_resource_identifiers(region: str) -> list[tuple[str, str]]:
         client = boto3.client("ecr", region_name=region)
@@ -39,7 +33,7 @@ class EcrRepository(ResourceTypeBase):
         for page in paginator.paginate():
             for repo in page["repositories"]:
                 name = repo["repositoryName"]
-                arn = f"arn:aws:ecr:{region}:{EcrRepository.get_account_id()}:repository/{name}"
+                arn = f"arn:aws:ecr:{region}:{get_account_id()}:repository/{name}"
                 tags = EcrRepository.get_tags(client, arn)
                 identifiers.append((name, tags))
 

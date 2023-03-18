@@ -3,6 +3,7 @@ from logging import getLogger
 import boto3
 
 from clean_orphaned_resources.resource_types.base import (
+    get_account_id,
     ResourceTypeBase,
     handle_boto3_exceptions,
 )
@@ -16,8 +17,8 @@ class DynamoDbTable(ResourceTypeBase):
 
     @staticmethod
     @handle_boto3_exceptions("")
-    def get_tags(client, name: str) -> str:
-        response = client.list_tags_of_resource(ResourceArn=name)
+    def get_tags(client, arn: str) -> str:
+        response = client.list_tags_of_resource(ResourceArn=arn)
         return ",".join([f"{tag['Key']}={tag['Value']}" for tag in response["Tags"]])
 
     @staticmethod
@@ -28,7 +29,8 @@ class DynamoDbTable(ResourceTypeBase):
         identifiers = []
 
         for name in response.get("TableNames", []):
-            tags = DynamoDbTable.get_tags(client, name)
+            arn = f"arn:aws:dynamodb:{region}:{get_account_id()}:table/{name}"
+            tags = DynamoDbTable.get_tags(client, arn)
             identifiers.append((name, tags))
 
         return identifiers
