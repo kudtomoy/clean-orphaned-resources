@@ -52,6 +52,15 @@ def get_stack_resources(region: str) -> dict[str, dict[str, dict[str, str]]]:
                         resources[stack_resource["ResourceType"]][
                             stack_resource["PhysicalResourceId"]
                         ] = {"resource_status": stack_resource["ResourceStatus"]}
+
+                        # Ensure Lambda does not delete LogGroup
+                        if stack_resource["ResourceType"] == "AWS::Lambda::Function":
+                            resource_id = (
+                                f'/aws/lambda/{stack_resource["PhysicalResourceId"]}'
+                            )
+                            resources["AWS::Logs::LogGroup"][resource_id] = {
+                                "resource_status": stack_resource["ResourceStatus"]
+                            }
     return resources
 
 
